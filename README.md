@@ -18,8 +18,8 @@ To configure, set CELERYBEAT_SCHEDULER to probit.scheduler.ProbitScheduler and s
 ```
 
 SCHEDULER EXAMPLES:
-# get scheduler
-scheduler = EntryProxy(StrictRedis.from_url(app.config["CELERY_REDIS_SCHEDULER_URL"])
+    # get scheduler
+    scheduler = EntryProxy(StrictRedis.from_url(app.config["CELERY_REDIS_SCHEDULER_URL"])
 
 # create new scheduler entry
 # with timedelta every 3 seconds
@@ -68,4 +68,3 @@ tasks = scheduler.get_for_all()
 
 # load companys scheduled tasks
 companyTasks = scheduler.get_for_company(company_id)
-
