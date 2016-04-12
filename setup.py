@@ -33,7 +33,7 @@ THE SOFTWARE.
 
 setup(
     name='probit-scheduler',
-    version='0.1.0',
+    version='0.1.1',
     license='MIT',
     packages=find_packages(),
     include_package_data=True,
