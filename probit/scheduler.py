@@ -20,16 +20,18 @@ class EntryProxy(dict):
         self.__redis_connection = redis_connection
         self._load_all_entries()
 
-    def _load_all_entries(self):
-        entries = self.__redis_connection.hgetall(ENTRY_LIST_KEY)
-        for entry in entries.values():
-            data = json.loads(entry.decode('utf-8'))
-            if data["last_run_at"]:
-                data["last_run_at"] = datetime.strptime(data["last_run_at"], '%Y-%m-%dT%H:%M:%S.%f')
-            self._load(data)
+    # load all scheduler entries
+    def _load_all_entries(self, hashName = ENTRY_LIST_KEY):
+        keys = self.__redis_connection.scan_iter(match="probit:schedule:*")
+        for key in keys:
+            entries = self.__redis_connection.hgetall(key.decode('utf-8'))
+            for entry in entries.values():
+                data = json.loads(entry.decode('utf-8'))
+                if data["last_run_at"]:
+                    data["last_run_at"] = datetime.strptime(data["last_run_at"], '%Y-%m-%dT%H:%M:%S.%f')
+                self._load(data)
 
-            print(str(entry))
-    
+    # load entry to scheduler from redis
     def _load(self, record):
         try:
             entry = ScheduleEntry(record['name'], record['task'], record['last_run_at'],
@@ -39,7 +41,65 @@ class EntryProxy(dict):
             return entry
         except Exception as e:
             return None
-        
+
+    # save entry for all companies(db)
+    def save_for_all(self, entry):
+        fields = {}
+        fields['name'] = entry.name
+        fields['schedule'] = from_schedule(entry.schedule)
+        fields['task'] = entry.task
+        fields['args'] = entry.args
+        fields['kwargs'] = entry.kwargs
+        fields['options'] = entry.options
+        fields['last_run_at'] = entry.last_run_at
+        fields['total_run_count'] = entry.total_run_count
+        serialized = json.dumps(objISODateString(fields))
+        self.__redis_connection.hmset(ENTRY_LIST_KEY, {entry.name: serialized})
+
+
+    # save entry for specified company(db)
+    def save_for_company(self, id, entry):
+        fields = {}
+        fields['name'] = entry.name
+        fields['schedule'] = from_schedule(entry.schedule)
+        fields['task'] = entry.task
+        fields['args'] = entry.args
+        fields['kwargs'] = entry.kwargs
+        fields['options'] = entry.options
+        fields['last_run_at'] = entry.last_run_at
+        fields['total_run_count'] = entry.total_run_count
+        serialized = json.dumps(objISODateString(fields))
+        self.__redis_connection.hmset(ENTRY_LIST_KEY + ":" + id, {entry.name: serialized})
+
+    # get tasks that are global
+    def get_for_all(self):
+        data = []
+        entries = self.__redis_connection.hgetall(ENTRY_LIST_KEY)
+        for entry in entries.values():
+            entry = json.loads(entry.decode('utf-8'))
+            if entry["last_run_at"]:
+                entry["last_run_at"] = datetime.strptime(entry["last_run_at"], '%Y-%m-%dT%H:%M:%S.%f')
+            data.append(entry)
+
+        return data
+
+    # get tasks from company(db)
+    def get_for_company(self, company_id):
+        data = []
+        entries = self.__redis_connection.hgetall(ENTRY_LIST_KEY + ":" + company_id)
+        for entry in entries.values():
+            entry = json.loads(entry.decode('utf-8'))
+            if entry["last_run_at"]:
+                entry["last_run_at"] = datetime.strptime(entry["last_run_at"], '%Y-%m-%dT%H:%M:%S.%f')
+            data.append(entry)
+        return data
+
+    # remove task from all
+    def remove_for_all(self, name):
+        result = self.__redis_connection.hdel(ENTRY_LIST_KEY, (name))
+        pass
+
+
     def _save(self, entry):
         print(str(entry))
         fields = {}
@@ -53,7 +113,7 @@ class EntryProxy(dict):
         fields['total_run_count'] = entry.total_run_count
         serialized = json.dumps(objISODateString(fields))
         self.__redis_connection.hmset(ENTRY_LIST_KEY, {entry.name: serialized})
-        
+
     def __setitem__(self, name, entry):
         dict.__setitem__(self, name, entry)
         self._save(entry)
