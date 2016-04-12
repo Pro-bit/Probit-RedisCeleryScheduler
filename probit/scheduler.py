@@ -97,7 +97,10 @@ class EntryProxy(dict):
     # remove task from all
     def remove_for_all(self, name):
         result = self.__redis_connection.hdel(ENTRY_LIST_KEY, (name))
-        pass
+
+    # remove task from all
+    def remove_for_company(self, company_id, name):
+        result = self.__redis_connection.hdel(ENTRY_LIST_KEY + ":" + company_id, (name))
 
 
     def _save(self, entry):

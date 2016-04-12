@@ -69,4 +69,11 @@ tasks = scheduler.get_for_all()
 
 # load companys scheduled tasks
 companyTasks = scheduler.get_for_company(company_id)
+
+# delete task from global tasks
+scheduler.remove_for_all("TaskName")
+
+# delete tasks from company
+scheduler.remove_for_company(company_id, "TaskName")
+
 ```
