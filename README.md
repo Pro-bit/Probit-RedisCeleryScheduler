@@ -5,7 +5,7 @@ To install use:
 
 
 To configure, set CELERYBEAT_SCHEDULER to probit.scheduler.ProbitScheduler and specify a CELERY_REDIS_SCHEDULER_URL.
-```
+```python
     CELERYBEAT_SCHEDULER="probit.scheduler.ProbitScheduler"
 	CELERY_REDIS_SCHEDULER_URL = "redis://localhost:6379/1"
 	CELERYBEAT_SCHEDULE = {
@@ -18,7 +18,7 @@ To configure, set CELERYBEAT_SCHEDULER to probit.scheduler.ProbitScheduler and s
 ```
 
 SCHEDULER EXAMPLES:
-```
+```python
 # get scheduler
 scheduler = EntryProxy(StrictRedis.from_url(app.config["CELERY_REDIS_SCHEDULER_URL"])
 
