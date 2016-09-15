@@ -104,7 +104,7 @@ class EntryProxy(dict):
 
 
     def _save(self, entry):
-        print(str(entry))
+        #print(str(entry))
         fields = {}
         fields['name'] = entry.name
         fields['schedule'] = from_schedule(entry.schedule)
@@ -143,11 +143,13 @@ class ProbitScheduler(Scheduler):
         self.__redis_connection = redis_connection
         if self.__redis_connection is None:
              self.__redis_connection = StrictRedis.from_url(current_app.conf.CELERY_REDIS_SCHEDULER_URL)
+
         self._schedule = EntryProxy(self.__redis_connection)
         self._locker = locker
         if self._locker is None:
             self._locker = Redlock([current_app.conf.CELERY_REDIS_SCHEDULER_URL])
         super(ProbitScheduler, self).__init__(*args, **kwargs)
+
 
     def setup_schedule(self):
         self.install_default_entries(self._schedule)
@@ -192,6 +194,8 @@ class ProbitScheduler(Scheduler):
         self._locker.unlock(lock)
         
     def _merge(self, schedule):
+        self.__redis_connection.hdel(ENTRY_LIST_KEY, *self.__redis_connection.hgetall(ENTRY_LIST_KEY).keys())
+
         for name, entry_dict in schedule.items():
             entry = ScheduleEntry(name, **entry_dict)
             if name not in self._schedule:
