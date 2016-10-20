@@ -194,7 +194,10 @@ class ProbitScheduler(Scheduler):
         self._locker.unlock(lock)
         
     def _merge(self, schedule):
-        self.__redis_connection.hdel(ENTRY_LIST_KEY, *self.__redis_connection.hgetall(ENTRY_LIST_KEY).keys())
+        schedule_keys = self.__redis_connection.hgetall(ENTRY_LIST_KEY).keys()
+
+        if len(schedule_keys) > 0:
+            self.__redis_connection.hdel(ENTRY_LIST_KEY, *schedule_keys)
 
         for name, entry_dict in schedule.items():
             entry = ScheduleEntry(name, **entry_dict)
