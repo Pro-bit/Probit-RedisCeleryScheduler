@@ -12,6 +12,7 @@ from datetime import timedelta, datetime
 
 ENTRY_LIST_KEY = "probit:schedule:entries"
 
+
 class EntryProxy(dict):
     """ A ScheduleEntry dictionary that mirrors a mongodb collection """
 
@@ -21,7 +22,7 @@ class EntryProxy(dict):
         self._load_all_entries()
 
     # load all scheduler entries
-    def _load_all_entries(self, hashName = ENTRY_LIST_KEY):
+    def _load_all_entries(self, hashName=ENTRY_LIST_KEY):
         keys = self.__redis_connection.scan_iter(match="probit:schedule:*")
         for key in keys:
             entries = self.__redis_connection.hgetall(key.decode('utf-8'))
@@ -35,15 +36,15 @@ class EntryProxy(dict):
     def _load(self, record):
         try:
             entry = ScheduleEntry(record['name'], record['task'], record['last_run_at'],
-                record['total_run_count'], to_schedule(record['schedule']),
-                record['args'], record['kwargs'], record['options'])
+                                  record['total_run_count'], to_schedule(record['schedule']),
+                                  record['args'], record['kwargs'], record['options'])
             dict.__setitem__(self, entry.name, entry)
             return entry
         except Exception as e:
             return None
 
-    # save entry for all companies(db)
-    def save_for_all(self, entry):
+    # save entry
+    def save_task(self, entry):
         fields = {}
         fields['name'] = entry.name
         fields['schedule'] = from_schedule(entry.schedule)
@@ -56,7 +57,6 @@ class EntryProxy(dict):
         serialized = json.dumps(objISODateString(fields))
         self.__redis_connection.hmset(ENTRY_LIST_KEY, {entry.name: serialized})
 
-
     # save entry for specified company(db)
     def save_for_company(self, id, entry):
         fields = {}
@@ -65,14 +65,14 @@ class EntryProxy(dict):
         fields['task'] = entry.task
         fields['args'] = entry.args
         fields['kwargs'] = entry.kwargs
-        fields['options'] = entry.options
+        # save group_id option
+        fields['options'] = {"group_id": id}
         fields['last_run_at'] = entry.last_run_at
         fields['total_run_count'] = entry.total_run_count
         serialized = json.dumps(objISODateString(fields))
-        self.__redis_connection.hmset(ENTRY_LIST_KEY + ":" + id, {entry.name: serialized})
 
     # get tasks that are global
-    def get_for_all(self):
+    def get_tasks(self):
         data = []
         entries = self.__redis_connection.hgetall(ENTRY_LIST_KEY)
         for entry in entries.values():
@@ -95,16 +95,14 @@ class EntryProxy(dict):
         return data
 
     # remove task from all
-    def remove_for_all(self, name):
+    def remove_task(self, name):
         result = self.__redis_connection.hdel(ENTRY_LIST_KEY, (name))
 
     # remove task from all
     def remove_for_company(self, company_id, name):
-        result = self.__redis_connection.hdel(ENTRY_LIST_KEY + ":" + company_id, (name))
-
+        result = self.__redis_connection.hdel(ENTRY_LIST_KEY + ":" + company_id, name)
 
     def _save(self, entry):
-        #print(str(entry))
         fields = {}
         fields['name'] = entry.name
         fields['schedule'] = from_schedule(entry.schedule)
@@ -115,41 +113,46 @@ class EntryProxy(dict):
         fields['last_run_at'] = entry.last_run_at
         fields['total_run_count'] = entry.total_run_count
         serialized = json.dumps(objISODateString(fields))
-        self.__redis_connection.hmset(ENTRY_LIST_KEY, {entry.name: serialized})
+        if fields['options'] and fields['options']['group_id']:
+            self.__redis_connection.hmset(ENTRY_LIST_KEY+":"+fields['options'].get("group_id"), {entry.name: serialized})
+        else:
+            self.__redis_connection.hmset(ENTRY_LIST_KEY, {entry.name: serialized})
 
     def __setitem__(self, name, entry):
         dict.__setitem__(self, name, entry)
         self._save(entry)
-        
+
     def update(self, other):
         dict.update(self, other)
         for entry in other.items():
             self._save(entry)
-            
+
     def sync(self, name):
-        record = self.__redis_connection.hget(ENTRY_LIST_KEY, name)
-        if record is None:
-            self.pop(name, None)
-            return None
-        else:
-            data = json.loads(record.decode('utf-8'))
-            if data["last_run_at"]:
-                data["last_run_at"] = datetime.strptime(data["last_run_at"], '%Y-%m-%dT%H:%M:%S.%f')
-            return self._load(data)
+        keys = self.__redis_connection.scan_iter(match="probit:schedule:*")
+        for key in keys:
+            record = self.__redis_connection.hget(key.decode('utf-8'), name)
+
+            if record is not None:
+                data = json.loads(record.decode('utf-8'))
+                if data["last_run_at"]:
+                    data["last_run_at"] = datetime.strptime(data["last_run_at"], '%Y-%m-%dT%H:%M:%S.%f')
+                return self._load(data)
+
+        self.pop(name, None)
+        return None
 
 
 class ProbitScheduler(Scheduler):
     def __init__(self, redis_connection=None, locker=None, *args, **kwargs):
         self.__redis_connection = redis_connection
         if self.__redis_connection is None:
-             self.__redis_connection = StrictRedis.from_url(current_app.conf.CELERY_REDIS_SCHEDULER_URL)
+            self.__redis_connection = StrictRedis.from_url(current_app.conf.CELERY_REDIS_SCHEDULER_URL)
 
         self._schedule = EntryProxy(self.__redis_connection)
         self._locker = locker
         if self._locker is None:
             self._locker = Redlock([current_app.conf.CELERY_REDIS_SCHEDULER_URL])
         super(ProbitScheduler, self).__init__(*args, **kwargs)
-
 
     def setup_schedule(self):
         self.install_default_entries(self._schedule)
@@ -163,9 +166,9 @@ class ProbitScheduler(Scheduler):
     def sync(self):
         # Reload the schedule from the collection
         self._schedule = EntryProxy(self.__redis_connection)
-    
+
     # I'm not sure what reserve() is intended to do, but it does not do what we
-    # need it to do, so we define a _lock() method as well. 
+    # need it to do, so we define a _lock() method as well.
     def maybe_due(self, entry, publisher=None):
         is_due, next_time_to_run = entry.is_due()
         if not is_due:
@@ -182,7 +185,7 @@ class ProbitScheduler(Scheduler):
             is_due, next_time_to_run = entry.is_due()
             if not is_due:
                 return next_time_to_run
-            
+
             return Scheduler.maybe_due(self, entry, publisher)
         finally:
             self._unlock(lock)
@@ -192,12 +195,12 @@ class ProbitScheduler(Scheduler):
 
     def _unlock(self, lock):
         self._locker.unlock(lock)
-        
+
     def _merge(self, schedule):
-        schedule_keys = self.__redis_connection.hgetall(ENTRY_LIST_KEY).keys()
+        """schedule_keys = self.__redis_connection.hgetall(ENTRY_LIST_KEY).keys()
 
         if len(schedule_keys) > 0:
-            self.__redis_connection.hdel(ENTRY_LIST_KEY, *schedule_keys)
+            self.__redis_connection.hdel(ENTRY_LIST_KEY, *schedule_keys)"""
 
         for name, entry_dict in schedule.items():
             entry = ScheduleEntry(name, **entry_dict)
@@ -217,6 +220,7 @@ class ProbitScheduler(Scheduler):
                     finally:
                         self._unlock(lock)
 
+
 def from_schedule(schedule):
     result = {}
     if isinstance(schedule, crontab):
@@ -232,12 +236,14 @@ def from_schedule(schedule):
         result['relative'] = schedule.relative
     return result
 
+
 def to_schedule(dict_):
     if dict_['type'] == 'crontab':
         return crontab(dict_['minute'], dict_['hour'], dict_['day_of_week'])
     assert dict_['type'] == 'delta', dict_['type']
     delta = timedelta(dict_['days'], dict_['seconds'], dict_['microseconds'])
-    return schedule(delta, dict_['relative']) 
+    return schedule(delta, dict_['relative'])
+
 
 def objISODateString(obj):
     if isinstance(obj, dict):
@@ -247,6 +253,6 @@ def objISODateString(obj):
         for item in obj:
             item = objISODateString(item)
     elif isinstance(obj, datetime):
-            obj = obj.isoformat()
+        obj = obj.isoformat()
 
     return obj

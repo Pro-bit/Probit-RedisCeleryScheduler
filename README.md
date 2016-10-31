@@ -3,6 +3,9 @@ probit-scheduler - Dynamic JSON redis backed scheduler for celery made from http
 To install use:
 	pip install probit-scheduler
 
+To start scheduler use cli command (type of celery beat scheduler):
+    celery -A {proj_dir} beat -S probit.scheduler.ProbitScheduler --workdir="{working_dir}" -f "{log_path}" -l warning
+
 
 To configure, set CELERYBEAT_SCHEDULER to probit.scheduler.ProbitScheduler and specify a CELERY_REDIS_SCHEDULER_URL.
 ```python
@@ -50,34 +53,18 @@ entry = scheduler.load({
     "total_run_count": 5
 })
 
-# save global scheduler task for all databases (update task also like this)
-scheduler.save_for_all(entry)
+# save global scheduler task (update task with the same call)
+scheduler.save_task(entry)
 
-# save scheduler task for specified company
-# create new scheduler entry for company (here we have to add company id to arguments of the task)
-entry = scheduler.load({
-    "name": "myNewTask",
-    "schedule": {'seconds': 3, 'days': 0, 'microseconds': 0, 'relative': False, 'type': 'delta'},
-    "task": "TestTask",
-    "args": [company_id],
-    "kwargs": {},
-    "options": {},
-    "last_run_at": None,
-    "total_run_count": 5
-})
-# save company task to redis
-scheduler.save_for_company(company_id, entry)
-
-# load global tasks
-tasks = scheduler.get_for_all()
-
-# load companys scheduled tasks
-companyTasks = scheduler.get_for_company(company_id)
+# get global tasks from redis
+tasks = scheduler.get_tasks()
 
 # delete task from global tasks
-scheduler.remove_for_all("TaskName")
-
-# delete tasks from company
-scheduler.remove_for_company(company_id, "TaskName")
+scheduler.remove_task("TaskName")
 
 ```
+
+**Future stuff**:
+    - save task for group (scheduler.save_group_task("group_name", entry))
+    - get tasks for group (scheduler.get_group_tasks("group_name"))
+    - remove task for group (scheduler.remove_group_task("group_name", "task_name"))
