@@ -1,4 +1,4 @@
-probit-scheduler - JSON redis backed scheduler for celery made directly from https://github.com/SPSCommerce/swiss-chard.
+probit-scheduler - Dynamic JSON redis backed scheduler for celery made from https://github.com/SPSCommerce/swiss-chard.
 
 To install use:
 	pip install probit-scheduler
@@ -17,10 +17,14 @@ To configure, set CELERYBEAT_SCHEDULER to probit.scheduler.ProbitScheduler and s
 	}
 ```
 
+Scheduler allows you dynamic addition and removal of task from scheduler.
+**Use case**: Enable or disable sending specific email messages every day at 3 o'clock.
+
 SCHEDULER EXAMPLES:
 ```python
-# get scheduler
-scheduler = EntryProxy(StrictRedis.from_url(app.config["CELERY_REDIS_SCHEDULER_URL"])
+# get scheduler from config key **CELERY_REDIS_SCHEDULER_URL** which is something like **'redis://localhost:6379/1'**
+# or if you have redis under password then something like **redis://:mypassword@localhost:6379/1**
+scheduler = EntryProxy(StrictRedis.from_url(app.config["CELERY_REDIS_SCHEDULER_URL"]))
 
 # create new scheduler entry
 # with timedelta every 3 seconds
@@ -61,7 +65,7 @@ entry = scheduler.load({
     "last_run_at": None,
     "total_run_count": 5
 })
-# save company task to redis to redis
+# save company task to redis
 scheduler.save_for_company(company_id, entry)
 
 # load global tasks
