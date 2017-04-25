@@ -1,6 +1,6 @@
 Metadata-Version: 1.0
 Name: probit-scheduler
-Version: 0.1.6
+Version: 0.1.7
 Summary: probit scheduler - JSON redis backed scheduler for celery beat.
 Home-page: https://github.com/Pro-bit/Probit-RedisCeleryScheduler
 Author: ProBitDeveloper
