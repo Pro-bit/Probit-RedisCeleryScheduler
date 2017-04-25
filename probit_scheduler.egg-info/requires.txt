@@ -1,0 +1,5 @@
+redis
+redlock-py
+celery==3.1.25
+billiard==3.3.0.23
+kombu==3.0.37

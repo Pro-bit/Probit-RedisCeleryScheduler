@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 # allow setup.py to be run from any path
 os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 
-REQUIREMENTS = ["redis", "redlock-py"]
+REQUIREMENTS = ["redis", "redlock-py", "celery==3.1.25", "billiard==3.3.0.23", "kombu==3.0.37"]
 
 README = """
 probit-scheduler - redis backed scheduler for celery beat. This scheduler was made from https://github.com/SPSCommerce/swiss-chard.git with some modifications.
@@ -33,7 +33,7 @@ THE SOFTWARE.
 
 setup(
     name='probit-scheduler',
-    version='0.1.5',
+    version='0.1.6',
     license='MIT',
     packages=find_packages(),
     include_package_data=True,
